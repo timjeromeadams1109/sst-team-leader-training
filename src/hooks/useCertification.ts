@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { TestResult, TierStatus } from "@/data/courses/types";
+import { trackEvent } from "@/lib/track";
 
 const STORAGE_KEY = "sst-training-certification";
 
@@ -63,6 +64,13 @@ export function useCertification() {
         [key]: { ...prev[key], [result.courseId]: result },
       };
       saveCert(next);
+      trackEvent({
+        event_type: "test_result",
+        course_id: result.courseId,
+        score: result.score,
+        test_type: result.testType,
+        passed: result.passed,
+      });
       return next;
     });
   }, []);

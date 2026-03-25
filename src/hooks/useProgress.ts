@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { trackEvent } from "@/lib/track";
 
 const STORAGE_KEY = "sst-training-progress";
 
@@ -48,6 +49,7 @@ export function useProgress() {
           },
         };
         saveProgress(next);
+        trackEvent({ event_type: "lesson_complete", course_id: courseId, lesson_id: lessonId });
         return next;
       });
     },
