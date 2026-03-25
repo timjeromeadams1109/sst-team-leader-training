@@ -58,6 +58,12 @@ export default function RootLayout({
                 >
                   Academy
                 </a>
+                <a
+                  href="/resources"
+                  className="text-gray-300 hover:text-sst-orange transition-colors"
+                >
+                  Documents
+                </a>
               </nav>
             </div>
           </div>
