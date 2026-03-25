@@ -10,6 +10,7 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://sst-team-leader-training.vercel.app"),
   title: "SST Team Leader Training | Simpson Strong-Tie",
   description:
     "Simpson Strong-Tie Team Leader Training Academy — Building leaders who build safer, stronger structures. TPS & WCM certified.",
