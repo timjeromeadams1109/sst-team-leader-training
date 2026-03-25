@@ -3,6 +3,7 @@ import { Geist } from "next/font/google";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { InactivityGuard } from "@/components/layout/InactivityGuard";
+import { FloatingChat } from "@/components/layout/FloatingChat";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -68,6 +69,7 @@ export default function RootLayout({
         <InactivityGuard />
         <main className="flex-1">{children}</main>
         <Footer />
+        <FloatingChat />
       </body>
     </html>
   );
