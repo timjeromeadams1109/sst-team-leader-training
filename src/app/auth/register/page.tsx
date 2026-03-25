@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { UserPlus, Mail, Lock, User, AlertCircle, ArrowRight } from "lucide-react";
 
-export default function RegisterPage() {
+function RegisterForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next") || "/academy";
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +31,7 @@ export default function RegisterPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        router.push("/academy");
+        router.push(nextUrl);
       } else {
         setError(data.error || "Registration failed");
       }
@@ -134,9 +137,17 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-sst-gray mt-4">
           Already have an account?{" "}
-          <Link href="/auth/login" className="text-sst-orange font-medium hover:underline">Sign In</Link>
+          <Link href={`/auth/login?next=${encodeURIComponent(nextUrl)}`} className="text-sst-orange font-medium hover:underline">Sign In</Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }

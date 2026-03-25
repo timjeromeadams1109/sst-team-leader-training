@@ -22,9 +22,12 @@ const navItems = [
   { href: "/suggestions", label: "Suggestions", icon: MessageSquarePlus },
 ];
 
+import { useAuth } from "@/hooks/useAuth";
+
 export function Header() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { user, isAuthenticated, logout } = useAuth();
 
   return (
     <>
@@ -69,14 +72,23 @@ export function Header() {
             </nav>
 
             <div className="flex items-center gap-2">
-              {/* Auth links */}
-              <Link
-                href="/auth/login"
-                className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
-              >
-                <UserCircle className="w-4 h-4" />
-                Sign In
-              </Link>
+              {isAuthenticated ? (
+                <button
+                  onClick={logout}
+                  className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  <UserCircle className="w-4 h-4" />
+                  <span className="max-w-24 truncate">{user?.name?.split(" ")[0]}</span>
+                </button>
+              ) : (
+                <Link
+                  href="/auth/login"
+                  className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                >
+                  <UserCircle className="w-4 h-4" />
+                  Sign In
+                </Link>
+              )}
 
               {/* Mobile hamburger */}
               <button
@@ -136,22 +148,39 @@ export function Header() {
               })}
             </nav>
             <div className="mt-6 pt-6 border-t border-white/10 space-y-1">
-              <Link
-                href="/auth/login"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
-              >
-                <UserCircle className="w-5 h-5" />
-                Sign In
-              </Link>
-              <Link
-                href="/auth/register"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-sst-orange hover:bg-sst-orange/10 transition-all"
-              >
-                <UserCircle className="w-5 h-5" />
-                Create Account
-              </Link>
+              {isAuthenticated ? (
+                <>
+                  <div className="px-4 py-2 text-xs text-gray-500">
+                    Signed in as <span className="text-gray-300">{user?.name}</span>
+                  </div>
+                  <button
+                    onClick={() => { logout(); setMobileOpen(false); }}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-400 hover:bg-white/5 transition-all w-full text-left"
+                  >
+                    <UserCircle className="w-5 h-5" />
+                    Sign Out
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/auth/login"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+                  >
+                    <UserCircle className="w-5 h-5" />
+                    Sign In
+                  </Link>
+                  <Link
+                    href="/auth/register"
+                    onClick={() => setMobileOpen(false)}
+                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-sst-orange hover:bg-sst-orange/10 transition-all"
+                  >
+                    <UserCircle className="w-5 h-5" />
+                    Create Account
+                  </Link>
+                </>
+              )}
             </div>
             <div className="mt-4 pt-4 border-t border-white/10">
               <p className="text-[10px] text-gray-600 leading-relaxed">

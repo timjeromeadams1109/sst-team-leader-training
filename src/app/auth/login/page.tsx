@@ -1,12 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { LogIn, Mail, Lock, AlertCircle, ArrowRight } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const nextUrl = searchParams.get("next") || "/academy";
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -25,7 +28,7 @@ export default function LoginPage() {
       });
       const data = await res.json();
       if (res.ok) {
-        router.push("/academy");
+        router.push(nextUrl);
       } else {
         setError(data.error || "Login failed");
       }
@@ -100,9 +103,19 @@ export default function LoginPage() {
 
         <p className="text-center text-sm text-sst-gray mt-4">
           Don&apos;t have an account?{" "}
-          <Link href="/auth/register" className="text-sst-orange font-medium hover:underline">Create Account</Link>
+          <Link href={`/auth/register?next=${encodeURIComponent(nextUrl)}`} className="text-sst-orange font-medium hover:underline">
+            Create Account
+          </Link>
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   );
 }
