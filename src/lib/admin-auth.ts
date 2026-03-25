@@ -10,8 +10,8 @@ const COOKIE_NAME = "sst-admin-token";
 export async function verifyPassword(password: string): Promise<boolean> {
   const hash = process.env.ADMIN_PASSWORD_HASH;
   if (!hash) {
-    // Fallback for dev: allow "admin123" if no hash is set
-    return password === "admin123";
+    // Fallback: default admin password
+    return password === "Password123!";
   }
   return bcrypt.compare(password, hash);
 }
