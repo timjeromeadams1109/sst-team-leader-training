@@ -19,6 +19,7 @@ import { useCertification } from "@/hooks/useCertification";
 import { ProgressRing } from "@/components/shared/ProgressRing";
 import { Badge } from "@/components/shared/Badge";
 import { StepIndicator, Step } from "@/components/shared/StepIndicator";
+import { useAuth } from "@/hooks/useAuth";
 
 const tierIcons = {
   "tier-1-foundation": Shield,
@@ -49,6 +50,7 @@ export default function AcademyHub() {
     getPreTestResult,
     getPostTestResult,
   } = useCertification();
+  const { user } = useAuth();
 
   // Build journey steps for the top stepper
   const journeySteps: Step[] = [
@@ -90,7 +92,7 @@ export default function AcademyHub() {
         className="text-center mb-10"
       >
         <h1 className="text-3xl sm:text-4xl font-bold tracking-tight mb-2">
-          Training Academy
+          {user ? `Welcome, ${user.name.split(" ")[0]}` : "Training Academy"}
         </h1>
         <p className="text-sst-gray max-w-lg mx-auto text-sm sm:text-base">
           Master each tier to earn your certification. Pre-test → Study → Post-test.

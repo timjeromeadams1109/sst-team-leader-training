@@ -31,7 +31,7 @@ function RegisterForm() {
       });
       const data = await res.json();
       if (res.ok) {
-        router.push(nextUrl);
+        window.location.href = nextUrl;
       } else {
         setError(data.error || "Registration failed");
       }
