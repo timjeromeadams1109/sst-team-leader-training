@@ -6,12 +6,6 @@ export default function Home() {
       {/* Hero */}
       <section className="bg-sst-dark text-white py-16 sm:py-24">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="inline-flex items-center gap-2 bg-sst-orange/10 border border-sst-orange/30 rounded-full px-4 py-1.5 mb-6">
-            <span className="w-2 h-2 bg-sst-orange rounded-full animate-pulse" />
-            <span className="text-sst-orange text-sm font-medium">
-              Free Training Program
-            </span>
-          </div>
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
             Team Leader
             <br />
