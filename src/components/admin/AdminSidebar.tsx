@@ -14,12 +14,14 @@ import {
   ShieldCheck,
   Menu,
   X,
+  GitBranch,
 } from "lucide-react";
 
 const navItems = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/courses", label: "Courses", icon: BookOpen },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/changelog", label: "Changelog", icon: GitBranch },
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 

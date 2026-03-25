@@ -11,12 +11,13 @@ import {
   X,
   ShieldCheck,
   UserCircle,
+  MessageSquarePlus,
 } from "lucide-react";
 
 const navItems = [
   { href: "/academy", label: "Academy", icon: GraduationCap },
   { href: "/resources", label: "Documents", icon: FileText },
-  { href: "/admin", label: "Admin", icon: ShieldCheck },
+  { href: "/suggestions", label: "Suggestions", icon: MessageSquarePlus },
 ];
 
 export function Header() {

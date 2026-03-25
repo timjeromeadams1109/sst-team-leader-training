@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" fill="none">
+  <rect width="1200" height="630" fill="#111111"/>
+  <rect x="0" y="0" width="1200" height="4" fill="#FF5308"/>
+  <!-- Background pattern -->
+  <circle cx="1050" cy="200" r="180" fill="#FF5308" opacity="0.05"/>
+  <circle cx="150" cy="500" r="120" fill="#FF5308" opacity="0.03"/>
+  <!-- SST Logo box -->
+  <rect x="60" y="60" width="70" height="70" rx="16" fill="#FF5308"/>
+  <text x="95" y="105" font-family="Arial,sans-serif" font-size="24" font-weight="bold" fill="white" text-anchor="middle">SST</text>
+  <!-- Title -->
+  <text x="60" y="220" font-family="Arial,sans-serif" font-size="56" font-weight="bold" fill="white">Team Leader</text>
+  <text x="60" y="290" font-family="Arial,sans-serif" font-size="56" font-weight="bold" fill="#FF5308">Training Academy</text>
+  <!-- Subtitle -->
+  <text x="60" y="350" font-family="Arial,sans-serif" font-size="22" fill="#848484">Simpson Strong-Tie | TPS &amp; WCM Certified</text>
+  <!-- Tier badges -->
+  <rect x="60" y="400" width="140" height="36" rx="18" fill="#22C55E" opacity="0.15"/>
+  <text x="130" y="424" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#22C55E" text-anchor="middle">Foundation</text>
+  <rect x="220" y="400" width="140" height="36" rx="18" fill="#F59E0B" opacity="0.15"/>
+  <text x="290" y="424" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#F59E0B" text-anchor="middle">Developing</text>
+  <rect x="380" y="400" width="140" height="36" rx="18" fill="#8B5CF6" opacity="0.15"/>
+  <text x="450" y="424" font-family="Arial,sans-serif" font-size="14" font-weight="bold" fill="#8B5CF6" text-anchor="middle">Advanced</text>
+  <!-- BARC -->
+  <text x="60" y="530" font-family="Arial,sans-serif" font-size="14" fill="#848484">Be Customer Focused · Act with Integrity · Respect Others · Continuously Improve</text>
+  <!-- Quote -->
+  <text x="60" y="570" font-family="Arial,sans-serif" font-size="12" fill="#555" font-style="italic">"Great companies are built with great people." — Barc Simpson, Founder</text>
+</svg>

@@ -12,7 +12,7 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "SST Team Leader Training | Simpson Strong-Tie",
   description:
-    "Simpson Strong-Tie Team Leader Training Academy — Building leaders who build safer, stronger structures.",
+    "Simpson Strong-Tie Team Leader Training Academy — Building leaders who build safer, stronger structures. TPS & WCM certified.",
   keywords: [
     "Simpson Strong-Tie",
     "team leader training",
@@ -23,6 +23,29 @@ export const metadata: Metadata = {
     "TPS",
     "WCM",
   ],
+  openGraph: {
+    title: "SST Team Leader Training Academy",
+    description:
+      "Build the skills to lead with excellence. 3-tier training grounded in Toyota Production System & World Class Manufacturing.",
+    url: "https://sst-team-leader-training.vercel.app",
+    siteName: "Simpson Strong-Tie Training",
+    images: [
+      {
+        url: "/og-image.svg",
+        width: 1200,
+        height: 630,
+        alt: "SST Team Leader Training Academy",
+      },
+    ],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "SST Team Leader Training Academy",
+    description:
+      "Build the skills to lead with excellence. TPS & WCM certified training.",
+    images: ["/og-image.svg"],
+  },
 };
 
 export const viewport: Viewport = {

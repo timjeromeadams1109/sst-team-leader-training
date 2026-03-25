@@ -125,7 +125,29 @@ export default function AdminSettingsPage() {
 
 create index idx_sst_events_learner on sst_events(learner_id);
 create index idx_sst_events_type on sst_events(event_type);
-create index idx_sst_events_created on sst_events(created_at);`}
+create index idx_sst_events_created on sst_events(created_at);
+
+-- User accounts
+create table sst_users (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  email text unique not null,
+  password_hash text not null,
+  role text default 'learner',
+  created_at timestamptz default now()
+);
+create index idx_sst_users_email on sst_users(email);
+
+-- Suggestions
+create table sst_suggestions (
+  id uuid default gen_random_uuid() primary key,
+  name text default 'Anonymous',
+  category text not null,
+  message text not null,
+  status text default 'new',
+  created_at timestamptz default now()
+);
+create index idx_sst_suggestions_status on sst_suggestions(status);`}
               </pre>
               <p className="mt-2">3. Add these env vars in Vercel:</p>
               <pre className="bg-black/30 rounded-lg p-3 text-[11px] text-gray-300 mt-1">
