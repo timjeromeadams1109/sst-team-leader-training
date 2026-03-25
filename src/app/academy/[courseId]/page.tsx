@@ -14,7 +14,8 @@ export default function CoursePage({
   const { courseId } = use(params);
   const course = getCourse(courseId);
   const { isLessonComplete, getCourseProgress } = useProgress();
-  const { isCourseUnlocked, isTestPassed } = useCertification();
+  const { isCourseUnlocked, isPostTestPassed, isPreTestComplete, getPreTestResult, getPostTestResult } =
+    useCertification();
 
   if (!course) {
     return (
@@ -30,14 +31,17 @@ export default function CoursePage({
   const unlocked = isCourseUnlocked(courseId);
   const totalLessons = getTotalLessons(course);
   const progress = getCourseProgress(courseId, totalLessons);
+  const preTestDone = isPreTestComplete(courseId);
+  const hasTierAssessment = course.tier !== "mes-mastery";
 
+  // Gate: course locked (previous tier not passed)
   if (!unlocked) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
         <span className="text-4xl mb-4 block">🔒</span>
         <h1 className="text-2xl font-bold mb-4">Course Locked</h1>
         <p className="text-sst-gray mb-6">
-          Complete the previous tier assessment with 80% to unlock this course.
+          Complete the previous tier post-test with 80% to unlock this course.
         </p>
         <Link href="/academy" className="text-sst-orange hover:underline">
           Back to Academy
@@ -45,6 +49,41 @@ export default function CoursePage({
       </div>
     );
   }
+
+  // Gate: pre-test required before accessing content (tier courses only)
+  if (hasTierAssessment && !preTestDone) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+        <span className="text-5xl mb-4 block">📋</span>
+        <h1 className="text-2xl sm:text-3xl font-bold mb-3">
+          Pre-Test Required
+        </h1>
+        <p className="text-sst-gray mb-2 max-w-md mx-auto">
+          Before accessing <strong>{course.title}</strong> content, you must
+          complete the pre-training assessment to establish your baseline.
+        </p>
+        <p className="text-xs text-sst-gray mb-8">
+          There is no penalty for incorrect answers — this measures your starting
+          knowledge so we can track your growth.
+        </p>
+        <Link
+          href={`/academy/test/${courseId}?type=pre`}
+          className="inline-flex items-center gap-2 text-white font-semibold px-8 py-3.5 rounded-lg transition-colors text-lg"
+          style={{ backgroundColor: course.color }}
+        >
+          Take Pre-Test
+        </Link>
+        <div className="mt-4">
+          <Link href="/academy" className="text-sm text-sst-gray hover:text-sst-orange transition-colors">
+            ← Back to Academy
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const preResult = getPreTestResult(courseId);
+  const postResult = getPostTestResult(courseId);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -67,9 +106,9 @@ export default function CoursePage({
           >
             {course.tierLabel}
           </span>
-          {isTestPassed(courseId) && (
+          {isPostTestPassed(courseId) && (
             <span className="text-xs font-bold text-sst-success bg-sst-success/10 px-2.5 py-1 rounded-full">
-              ✓ Passed
+              ✓ Certified
             </span>
           )}
         </div>
@@ -98,6 +137,28 @@ export default function CoursePage({
             style={{ width: `${progress}%`, backgroundColor: course.color }}
           />
         </div>
+
+        {/* Pre/Post test scores */}
+        {hasTierAssessment && (preResult || postResult) && (
+          <div className="flex flex-wrap gap-3 mt-4">
+            {preResult && (
+              <div className="text-xs bg-blue-50 text-blue-700 px-3 py-1.5 rounded-lg">
+                Pre-Test: <strong>{preResult.score}%</strong>
+              </div>
+            )}
+            {postResult && (
+              <div className={`text-xs px-3 py-1.5 rounded-lg ${postResult.passed ? "bg-sst-success/10 text-green-700" : "bg-sst-warning/10 text-amber-700"}`}>
+                Post-Test: <strong>{postResult.score}%</strong>
+                {postResult.passed ? " ✓" : ` (attempt #${postResult.attempt})`}
+              </div>
+            )}
+            {preResult && postResult && (
+              <div className="text-xs bg-sst-light-gray text-sst-charcoal px-3 py-1.5 rounded-lg">
+                Growth: <strong>+{Math.max(0, postResult.score - preResult.score)} points</strong>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Learning objectives */}
@@ -121,17 +182,12 @@ export default function CoursePage({
           const modLessonsComplete = mod.lessons.filter((l) =>
             isLessonComplete(courseId, l.id)
           ).length;
-          const modProgress =
-            mod.lessons.length > 0
-              ? Math.round((modLessonsComplete / mod.lessons.length) * 100)
-              : 0;
 
           return (
             <div
               key={mod.id}
               className="bg-white rounded-xl border border-sst-border/50 overflow-hidden"
             >
-              {/* Module header */}
               <div className="p-5 sm:p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1">
@@ -142,14 +198,12 @@ export default function CoursePage({
                       <span className="text-xs text-sst-gray">
                         · {mod.durationMinutes} min
                       </span>
-                      {modProgress === 100 && (
+                      {modLessonsComplete === mod.lessons.length && mod.lessons.length > 0 && (
                         <span className="text-xs text-sst-success">✓</span>
                       )}
                     </div>
                     <h3 className="text-lg font-bold">{mod.title}</h3>
-                    <p className="text-sm text-sst-gray mt-1">
-                      {mod.subtitle}
-                    </p>
+                    <p className="text-sm text-sst-gray mt-1">{mod.subtitle}</p>
                   </div>
                   <div className="text-right">
                     <span className="text-sm font-medium" style={{ color: course.color }}>
@@ -159,7 +213,6 @@ export default function CoursePage({
                 </div>
               </div>
 
-              {/* Lessons */}
               <div className="border-t border-sst-border/30">
                 {mod.lessons.map((lesson, lessonIndex) => {
                   const complete = isLessonComplete(courseId, lesson.id);
@@ -169,34 +222,14 @@ export default function CoursePage({
                       href={`/academy/${courseId}/${mod.id}?lesson=${lesson.id}`}
                       className="flex items-center gap-3 px-5 sm:px-6 py-3.5 hover:bg-sst-light-gray/50 transition-colors border-b border-sst-border/20 last:border-b-0"
                     >
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                          complete
-                            ? "bg-sst-success text-white"
-                            : "bg-sst-light-gray text-sst-gray"
-                        }`}
-                      >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${complete ? "bg-sst-success text-white" : "bg-sst-light-gray text-sst-gray"}`}>
                         {complete ? "✓" : lessonIndex + 1}
                       </div>
-                      <span
-                        className={`text-sm flex-1 ${
-                          complete ? "text-sst-gray" : "text-sst-charcoal"
-                        }`}
-                      >
+                      <span className={`text-sm flex-1 ${complete ? "text-sst-gray" : "text-sst-charcoal"}`}>
                         {lesson.title}
                       </span>
-                      <svg
-                        className="w-4 h-4 text-sst-border"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M9 5l7 7-7 7"
-                        />
+                      <svg className="w-4 h-4 text-sst-border" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                     </Link>
                   );
@@ -207,19 +240,20 @@ export default function CoursePage({
         })}
       </div>
 
-      {/* Assessment CTA */}
-      {course.tier !== "mes-mastery" && (
+      {/* Post-Test CTA */}
+      {hasTierAssessment && (
         <div className="mt-8 bg-white rounded-xl border border-sst-border/50 p-6 text-center">
-          <h3 className="font-bold mb-2">Ready for the Assessment?</h3>
+          <h3 className="font-bold mb-2">Ready for the Post-Test?</h3>
           <p className="text-sm text-sst-gray mb-4">
             15 questions, 80% required to pass and unlock the next tier.
+            Compare your score to your pre-test to see your growth.
           </p>
           <Link
-            href={`/academy/test/${courseId}`}
+            href={`/academy/test/${courseId}?type=post`}
             className="inline-flex items-center gap-2 text-white font-semibold px-6 py-2.5 rounded-lg transition-colors"
             style={{ backgroundColor: course.color }}
           >
-            {isTestPassed(courseId) ? "Retake Assessment" : "Take Assessment"}
+            {isPostTestPassed(courseId) ? "Retake Post-Test" : "Take Post-Test"}
           </Link>
         </div>
       )}

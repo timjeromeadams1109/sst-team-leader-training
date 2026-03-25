@@ -7,8 +7,15 @@ import { useCertification } from "@/hooks/useCertification";
 
 export default function AcademyHub() {
   const { getCourseProgress } = useProgress();
-  const { getTierStatus, isCourseUnlocked, isTestPassed, isFullyCertified } =
-    useCertification();
+  const {
+    getTierStatus,
+    isCourseUnlocked,
+    isPostTestPassed,
+    isPreTestComplete,
+    isFullyCertified,
+    getPreTestResult,
+    getPostTestResult,
+  } = useCertification();
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -18,8 +25,8 @@ export default function AcademyHub() {
           Training Academy
         </h1>
         <p className="text-sst-gray max-w-xl mx-auto">
-          Complete each tier in order. Pass the assessment with 80% to unlock
-          the next tier. MES Mastery is available anytime.
+          Complete each tier in order. Take the pre-test first, then study the
+          material, then pass the post-test with 80% to unlock the next tier.
         </p>
         {isFullyCertified() && (
           <div className="mt-4 inline-flex items-center gap-2 bg-sst-success/10 border border-sst-success/30 text-sst-success px-4 py-2 rounded-lg text-sm font-semibold">
@@ -36,8 +43,12 @@ export default function AcademyHub() {
           const totalMin = getTotalDuration(course);
           const progress = getCourseProgress(course.courseId, totalLessons);
           const unlocked = isCourseUnlocked(course.courseId);
-          const passed = isTestPassed(course.courseId);
+          const postPassed = isPostTestPassed(course.courseId);
+          const preDone = isPreTestComplete(course.courseId);
           const tierStatus = getTierStatus(course.tier);
+          const hasTierAssessment = course.tier !== "mes-mastery";
+          const preResult = getPreTestResult(course.courseId);
+          const postResult = getPostTestResult(course.courseId);
 
           return (
             <div
@@ -48,11 +59,7 @@ export default function AcademyHub() {
                   : "border-sst-border/30 opacity-60"
               }`}
             >
-              {/* Color bar */}
-              <div
-                className="h-1.5"
-                style={{ backgroundColor: course.color }}
-              />
+              <div className="h-1.5" style={{ backgroundColor: course.color }} />
 
               <div className="p-6">
                 {/* Badge row */}
@@ -61,17 +68,14 @@ export default function AcademyHub() {
                     <span className="text-2xl">{course.icon}</span>
                     <span
                       className="text-xs font-bold px-2.5 py-1 rounded-full"
-                      style={{
-                        backgroundColor: course.color + "15",
-                        color: course.color,
-                      }}
+                      style={{ backgroundColor: course.color + "15", color: course.color }}
                     >
                       {course.tierLabel}
                     </span>
                   </div>
-                  {tierStatus === "completed" || passed ? (
+                  {tierStatus === "completed" || postPassed ? (
                     <span className="text-xs font-bold text-sst-success bg-sst-success/10 px-2.5 py-1 rounded-full">
-                      ✓ Passed
+                      ✓ Certified
                     </span>
                   ) : tierStatus === "locked" ? (
                     <span className="text-xs text-sst-gray bg-sst-light-gray px-2.5 py-1 rounded-full">
@@ -80,11 +84,8 @@ export default function AcademyHub() {
                   ) : null}
                 </div>
 
-                {/* Title */}
                 <h2 className="text-xl font-bold mb-2">{course.title}</h2>
-                <p className="text-sm text-sst-gray mb-4">
-                  {course.description}
-                </p>
+                <p className="text-sm text-sst-gray mb-4">{course.description}</p>
 
                 {/* Stats */}
                 <div className="flex items-center gap-4 text-xs text-sst-gray mb-4">
@@ -94,6 +95,27 @@ export default function AcademyHub() {
                   <span>·</span>
                   <span>{totalMin} min</span>
                 </div>
+
+                {/* Pre/Post test scores */}
+                {unlocked && hasTierAssessment && (preResult || postResult) && (
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    {preResult && (
+                      <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                        Pre: {preResult.score}%
+                      </span>
+                    )}
+                    {postResult && (
+                      <span className={`text-xs px-2 py-1 rounded ${postResult.passed ? "bg-sst-success/10 text-green-700" : "bg-sst-warning/10 text-amber-700"}`}>
+                        Post: {postResult.score}%{postResult.passed ? " ✓" : ""}
+                      </span>
+                    )}
+                    {preResult && postResult && (
+                      <span className="text-xs bg-sst-light-gray text-sst-charcoal px-2 py-1 rounded">
+                        +{Math.max(0, postResult.score - preResult.score)} growth
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Progress bar */}
                 {unlocked && (
@@ -105,10 +127,7 @@ export default function AcademyHub() {
                     <div className="h-2 bg-sst-light-gray rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${progress}%`,
-                          backgroundColor: course.color,
-                        }}
+                        style={{ width: `${progress}%`, backgroundColor: course.color }}
                       />
                     </div>
                   </div>
@@ -116,21 +135,43 @@ export default function AcademyHub() {
 
                 {/* Actions */}
                 {unlocked ? (
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-col gap-2">
+                    {/* Main action */}
                     <Link
                       href={`/academy/${course.courseId}`}
-                      className="flex-1 text-center text-sm font-semibold text-white py-2.5 rounded-lg transition-colors"
+                      className="text-center text-sm font-semibold text-white py-2.5 rounded-lg transition-colors"
                       style={{ backgroundColor: course.color }}
                     >
-                      {progress > 0 ? "Continue" : "Start"}
+                      {hasTierAssessment && !preDone
+                        ? "Take Pre-Test to Start"
+                        : progress > 0
+                          ? "Continue Training"
+                          : "Start Training"}
                     </Link>
-                    {course.tier !== "mes-mastery" && (
-                      <Link
-                        href={`/academy/test/${course.courseId}`}
-                        className="text-sm font-semibold px-4 py-2.5 rounded-lg border border-sst-border hover:bg-sst-light-gray transition-colors"
-                      >
-                        {passed ? "Retake Test" : "Take Test"}
-                      </Link>
+                    {/* Test buttons for tier courses */}
+                    {hasTierAssessment && (
+                      <div className="flex gap-2">
+                        <Link
+                          href={`/academy/test/${course.courseId}?type=pre`}
+                          className={`flex-1 text-center text-xs font-medium py-2 rounded-lg border transition-colors ${
+                            preDone
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : "border-sst-border hover:bg-sst-light-gray text-sst-charcoal"
+                          }`}
+                        >
+                          {preDone ? `Pre-Test: ${preResult?.score}%` : "Pre-Test"}
+                        </Link>
+                        <Link
+                          href={`/academy/test/${course.courseId}?type=post`}
+                          className={`flex-1 text-center text-xs font-medium py-2 rounded-lg border transition-colors ${
+                            postPassed
+                              ? "border-sst-success/30 bg-sst-success/10 text-green-700"
+                              : "border-sst-border hover:bg-sst-light-gray text-sst-charcoal"
+                          }`}
+                        >
+                          {postPassed ? `Post-Test: ${postResult?.score}% ✓` : "Post-Test"}
+                        </Link>
+                      </div>
                     )}
                   </div>
                 ) : (
@@ -147,12 +188,10 @@ export default function AcademyHub() {
       {/* BARC reminder */}
       <div className="mt-12 text-center text-sm text-sst-gray">
         <p className="font-medium text-sst-charcoal mb-1">
-          &ldquo;We help people build safer, stronger homes and
-          buildings.&rdquo;
+          &ldquo;We help people build safer, stronger homes and buildings.&rdquo;
         </p>
         <p>
-          Be Customer Focused · Act with Integrity · Respect Others ·
-          Continuously Improve
+          Be Customer Focused · Act with Integrity · Respect Others · Continuously Improve
         </p>
       </div>
     </div>

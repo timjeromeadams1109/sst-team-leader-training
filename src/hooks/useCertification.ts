@@ -6,18 +6,33 @@ import { TestResult, TierStatus } from "@/data/courses/types";
 const STORAGE_KEY = "sst-training-certification";
 
 interface CertState {
-  testResults: Record<string, TestResult>;
+  preTestResults: Record<string, TestResult>;
+  postTestResults: Record<string, TestResult>;
 }
 
 function loadCert(): CertState {
-  if (typeof window === "undefined") return { testResults: {} };
+  if (typeof window === "undefined")
+    return { preTestResults: {}, postTestResults: {} };
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) return JSON.parse(stored);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      // Migration: old format had testResults, new has pre/post
+      if (parsed.testResults && !parsed.postTestResults) {
+        return {
+          preTestResults: {},
+          postTestResults: parsed.testResults,
+        };
+      }
+      return {
+        preTestResults: parsed.preTestResults || {},
+        postTestResults: parsed.postTestResults || {},
+      };
+    }
   } catch {
     // ignore
   }
-  return { testResults: {} };
+  return { preTestResults: {}, postTestResults: {} };
 }
 
 function saveCert(state: CertState) {
@@ -30,7 +45,10 @@ function saveCert(state: CertState) {
 }
 
 export function useCertification() {
-  const [cert, setCert] = useState<CertState>({ testResults: {} });
+  const [cert, setCert] = useState<CertState>({
+    preTestResults: {},
+    postTestResults: {},
+  });
 
   useEffect(() => {
     setCert(loadCert());
@@ -38,54 +56,82 @@ export function useCertification() {
 
   const saveTestResult = useCallback((result: TestResult) => {
     setCert((prev) => {
+      const key =
+        result.testType === "pre" ? "preTestResults" : "postTestResults";
       const next = {
         ...prev,
-        testResults: { ...prev.testResults, [result.courseId]: result },
+        [key]: { ...prev[key], [result.courseId]: result },
       };
       saveCert(next);
       return next;
     });
   }, []);
 
-  const getTestResult = useCallback(
+  const getPreTestResult = useCallback(
     (courseId: string): TestResult | undefined => {
-      return cert.testResults[courseId];
+      return cert.preTestResults[courseId];
     },
     [cert]
   );
 
-  const isTestPassed = useCallback(
+  const getPostTestResult = useCallback(
+    (courseId: string): TestResult | undefined => {
+      return cert.postTestResults[courseId];
+    },
+    [cert]
+  );
+
+  const isPreTestComplete = useCallback(
     (courseId: string): boolean => {
-      const result = cert.testResults[courseId];
+      return !!cert.preTestResults[courseId];
+    },
+    [cert]
+  );
+
+  const isPostTestPassed = useCallback(
+    (courseId: string): boolean => {
+      const result = cert.postTestResults[courseId];
       return result?.passed ?? false;
     },
     [cert]
   );
 
+  const getPostTestAttempts = useCallback(
+    (courseId: string): number => {
+      const result = cert.postTestResults[courseId];
+      return result?.attempt ?? 0;
+    },
+    [cert]
+  );
+
   const getTierStatus = useCallback(
-    (tier: "foundation" | "developing" | "advanced" | "mes-mastery"): TierStatus => {
+    (
+      tier: "foundation" | "developing" | "advanced" | "mes-mastery"
+    ): TierStatus => {
       switch (tier) {
         case "foundation":
-          return isTestPassed("tier-1-foundation") ? "completed" : "unlocked";
-        case "developing":
-          return isTestPassed("tier-2-developing")
+          return isPostTestPassed("tier-1-foundation")
             ? "completed"
-            : isTestPassed("tier-1-foundation")
+            : "unlocked";
+        case "developing":
+          return isPostTestPassed("tier-2-developing")
+            ? "completed"
+            : isPostTestPassed("tier-1-foundation")
               ? "unlocked"
               : "locked";
         case "advanced":
-          return isTestPassed("tier-3-advanced")
+          return isPostTestPassed("tier-3-advanced")
             ? "completed"
-            : isTestPassed("tier-2-developing")
+            : isPostTestPassed("tier-2-developing")
               ? "unlocked"
               : "locked";
         case "mes-mastery":
-          return "unlocked"; // Always accessible
+          return "unlocked";
         default:
           return "locked";
       }
     },
-    [isTestPassed]
+    [isPostTestPassed]
   );
 
   const isCourseUnlocked = useCallback(
@@ -94,28 +140,28 @@ export function useCertification() {
         case "tier-1-foundation":
           return true;
         case "tier-2-developing":
-          return isTestPassed("tier-1-foundation");
+          return isPostTestPassed("tier-1-foundation");
         case "tier-3-advanced":
-          return isTestPassed("tier-2-developing");
+          return isPostTestPassed("tier-2-developing");
         case "mes-academy":
-          return true; // Always accessible
+          return true;
         default:
           return false;
       }
     },
-    [isTestPassed]
+    [isPostTestPassed]
   );
 
   const isFullyCertified = useCallback((): boolean => {
     return (
-      isTestPassed("tier-1-foundation") &&
-      isTestPassed("tier-2-developing") &&
-      isTestPassed("tier-3-advanced")
+      isPostTestPassed("tier-1-foundation") &&
+      isPostTestPassed("tier-2-developing") &&
+      isPostTestPassed("tier-3-advanced")
     );
-  }, [isTestPassed]);
+  }, [isPostTestPassed]);
 
   const resetCertification = useCallback(() => {
-    const next: CertState = { testResults: {} };
+    const next: CertState = { preTestResults: {}, postTestResults: {} };
     saveCert(next);
     setCert(next);
   }, []);
@@ -123,8 +169,11 @@ export function useCertification() {
   return {
     cert,
     saveTestResult,
-    getTestResult,
-    isTestPassed,
+    getPreTestResult,
+    getPostTestResult,
+    isPreTestComplete,
+    isPostTestPassed,
+    getPostTestAttempts,
     getTierStatus,
     isCourseUnlocked,
     isFullyCertified,

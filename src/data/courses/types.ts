@@ -40,6 +40,12 @@ export interface AssessmentQuestion {
   options: string[];
   correctIndex: number;
   explanation: string;
+  /** Alternative wordings for re-test shuffling */
+  variants?: {
+    question: string;
+    options: string[];
+    correctIndex: number;
+  }[];
 }
 
 export interface Assessment {
@@ -52,11 +58,13 @@ export interface Assessment {
 
 export interface TestResult {
   courseId: string;
+  testType: "pre" | "post";
   score: number;
   totalQuestions: number;
   passed: boolean;
   completedAt: string;
   answers: number[];
+  attempt: number;
 }
 
 export type TierStatus = "unlocked" | "locked" | "completed";
