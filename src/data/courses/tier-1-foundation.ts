@@ -276,11 +276,13 @@ Accurate scanning IS the standard process. Discipline here enables everything el
           title: "5S — Foundation of Excellence",
           content: `5S is a systematic methodology for workplace organization:
 
-**1S — SORT:** Remove unneeded items
-**2S — SET IN ORDER:** A place for everything, everything in its place
-**3S — SHINE:** Clean and inspect
-**4S — STANDARDIZE:** Make it visual
-**5S — SUSTAIN:** Build the habit
+**1S — SORT (Seiri):** Remove unneeded items
+**2S — SET IN ORDER (Seiton):** A place for everything, everything in its place
+**3S — SHINE (Seiso):** Clean and inspect
+**4S — STANDARDIZE (Seiketsu):** Make it visual
+**5S — SUSTAIN (Shitsuke):** Build the habit
+
+5S originates from the Toyota Production System (TPS) and is a foundational pillar of World Class Manufacturing (WCM). The Japanese terms remind us of the system's origins and its proven effectiveness across decades of manufacturing excellence.
 
 **Why 5S Matters:**
 • **SAFETY:** Clear paths, no trip hazards
@@ -367,7 +369,9 @@ Each person does ONE task on ONE envelope, then passes it immediately. Record ti
 
 **Key Learning:** One piece flow finds problems faster, reduces WIP, and delivers to customers sooner. The next process (your customer) gets product faster.
 
-In batch mode, if there's a defect, you might make 10 defective pieces before anyone catches it. In one-piece flow, the defect is caught after just 1 piece.`,
+In batch mode, if there's a defect, you might make 10 defective pieces before anyone catches it. In one-piece flow, the defect is caught after just 1 piece.
+
+**TPS Connection:** One-piece flow is a core element of Just-in-Time (JIT), one of the two pillars of the Toyota Production System. JIT means producing only what is needed, when it is needed, in the amount needed. Flow eliminates the three wastes Toyota identified: **Muda** (waste), **Muri** (overburden), and **Mura** (unevenness).`,
           keyTakeaways: [
             "One-piece flow delivers the first piece faster than batch",
             "Defects are caught sooner with one-piece flow",

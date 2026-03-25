@@ -114,7 +114,7 @@ People embrace the change. They see the value and integrate it into their work.
           title: "The Kaizen Mindset",
           content: `**KAI = Change** + **ZEN = Good** → **KAIZEN = Change for the Better**
 
-Kaizen isn't a program or a project — it's a mindset. Small improvements every day, by everyone, everywhere.
+Kaizen isn't a program or a project — it's a mindset. Small improvements every day, by everyone, everywhere. It is one of the three foundations of the TPS House (along with Heijunka/leveling and Standardized Work).
 
 **Kaizen Principles:**
 • Small daily improvements compound into massive results
@@ -136,6 +136,8 @@ Did it work? How do you know? What does the data say?
 
 **A — ACT:** Standardize if it worked, or adjust and try again
 If it worked, make it the new standard. If not, learn from it and try a new approach.
+
+PDCA was developed by Dr. W. Edwards Deming (building on Walter Shewhart's work) and became the backbone of Toyota's continuous improvement system. Toyota calls it the "scientific method of management."
 
 **Gemba** = "The real place" — go where the work happens. The best improvement ideas don't come from the conference room. They come from the people doing the work every day.
 

@@ -424,7 +424,14 @@ Your role as Team Leader: observe flow, identify where things stop moving, and w
         {
           id: "jidoka-andon",
           title: "Jidoka & the Andon System",
-          content: `**Jidoka** (autonomation) means "automation with a human touch." The principle: when an abnormality is detected, stop and fix it immediately rather than passing it on.
+          content: `**Jidoka** (自働化, autonomation) means "automation with a human touch." It is one of the two pillars of the Toyota Production System House (the other being Just-in-Time). The principle: when an abnormality is detected, stop and fix it immediately rather than passing it on.
+
+**The TPS House:**
+• **Roof:** Customer satisfaction (highest quality, lowest cost, shortest lead time)
+• **Pillar 1:** Just-in-Time (JIT) — one-piece flow, takt time, pull system
+• **Pillar 2:** Jidoka — build quality in, stop and fix, human intelligence
+• **Foundation:** Heijunka (leveling), Standardized Work, Kaizen (continuous improvement)
+• **Base:** Stability — 5S, TPM, visual management
 
 **The Andon System:**
 Andon is a signaling system that makes problems visible instantly. When a team member encounters an abnormality, they "pull Andon" to signal for help.
