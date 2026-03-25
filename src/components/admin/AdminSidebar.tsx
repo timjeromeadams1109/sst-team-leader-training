@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
@@ -11,6 +12,8 @@ import {
   LogOut,
   ExternalLink,
   ShieldCheck,
+  Menu,
+  X,
 } from "lucide-react";
 
 const navItems = [
@@ -20,7 +23,7 @@ const navItems = [
   { href: "/admin/settings", label: "Settings", icon: Settings },
 ];
 
-export function AdminSidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -30,7 +33,7 @@ export function AdminSidebar() {
   };
 
   return (
-    <aside className="w-60 bg-sst-dark border-r border-white/5 flex flex-col h-full">
+    <>
       {/* Logo */}
       <div className="p-5 border-b border-white/5">
         <div className="flex items-center gap-2.5">
@@ -55,6 +58,7 @@ export function AdminSidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onNavigate}
               className={clsx(
                 "flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
                 active
@@ -73,6 +77,7 @@ export function AdminSidebar() {
       <div className="p-3 border-t border-white/5 space-y-0.5">
         <Link
           href="/"
+          onClick={onNavigate}
           className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm text-gray-500 hover:text-white hover:bg-white/5 transition-all"
         >
           <ExternalLink className="w-4 h-4" />
@@ -86,6 +91,59 @@ export function AdminSidebar() {
           Sign Out
         </button>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function AdminSidebar() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-sst-dark border-b border-white/5 px-4 py-3 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 bg-sst-orange rounded-lg flex items-center justify-center">
+            <ShieldCheck className="w-3.5 h-3.5 text-white" />
+          </div>
+          <span className="text-sm font-bold text-white">SST Admin</span>
+        </div>
+        <button
+          onClick={() => setMobileOpen(true)}
+          className="p-2 text-gray-400 hover:text-white"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Mobile spacer */}
+      <div className="lg:hidden h-14" />
+
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-60 bg-sst-dark border-r border-white/5 flex-col h-full">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="absolute left-0 top-0 bottom-0 w-72 bg-sst-dark border-r border-white/10 shadow-2xl flex flex-col animate-fade-in">
+            <div className="flex items-center justify-end p-3">
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="p-2 text-gray-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <SidebarContent onNavigate={() => setMobileOpen(false)} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }

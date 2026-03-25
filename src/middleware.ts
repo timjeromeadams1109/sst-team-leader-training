@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 
-const JWT_SECRET = new TextEncoder().encode(
+const ADMIN_JWT_SECRET = new TextEncoder().encode(
   process.env.ADMIN_JWT_SECRET || "sst-training-admin-secret-change-me"
 );
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Only protect /admin routes (except /admin/login)
-  if (pathname.startsWith("/admin") && !pathname.startsWith("/admin/login")) {
+  // Protect /admin routes (except /admin/login and /api/admin/auth)
+  if (
+    pathname.startsWith("/admin") &&
+    !pathname.startsWith("/admin/login") &&
+    !pathname.startsWith("/api/admin/auth")
+  ) {
     const token = request.cookies.get("sst-admin-token")?.value;
 
     if (!token) {
@@ -17,7 +21,7 @@ export async function middleware(request: NextRequest) {
     }
 
     try {
-      await jwtVerify(token, JWT_SECRET);
+      await jwtVerify(token, ADMIN_JWT_SECRET);
       return NextResponse.next();
     } catch {
       return NextResponse.redirect(new URL("/admin/login", request.url));

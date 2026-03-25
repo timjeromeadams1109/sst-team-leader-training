@@ -35,6 +35,8 @@ export function Footer() {
                 { href: "/academy", label: "Training Academy" },
                 { href: "/resources", label: "Team Leader Documents" },
                 { href: "/admin", label: "Admin Dashboard" },
+                { href: "/privacy", label: "Privacy Policy" },
+                { href: "/terms", label: "Terms of Service" },
               ].map((link) => (
                 <Link
                   key={link.href}

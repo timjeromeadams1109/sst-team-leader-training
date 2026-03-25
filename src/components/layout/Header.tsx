@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   ShieldCheck,
+  UserCircle,
 } from "lucide-react";
 
 const navItems = [
@@ -64,13 +65,24 @@ export function Header() {
               })}
             </nav>
 
-            {/* Mobile hamburger */}
-            <button
-              onClick={() => setMobileOpen(true)}
-              className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
-            >
-              <Menu className="w-6 h-6" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Auth links */}
+              <Link
+                href="/auth/login"
+                className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <UserCircle className="w-4 h-4" />
+                Sign In
+              </Link>
+
+              {/* Mobile hamburger */}
+              <button
+                onClick={() => setMobileOpen(true)}
+                className="md:hidden p-2 text-gray-400 hover:text-white transition-colors"
+              >
+                <Menu className="w-6 h-6" />
+              </button>
+            </div>
           </div>
         </div>
       </header>
@@ -120,7 +132,25 @@ export function Header() {
                 );
               })}
             </nav>
-            <div className="mt-8 pt-6 border-t border-white/10">
+            <div className="mt-6 pt-6 border-t border-white/10 space-y-1">
+              <Link
+                href="/auth/login"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-gray-400 hover:text-white hover:bg-white/5 transition-all"
+              >
+                <UserCircle className="w-5 h-5" />
+                Sign In
+              </Link>
+              <Link
+                href="/auth/register"
+                onClick={() => setMobileOpen(false)}
+                className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-sst-orange hover:bg-sst-orange/10 transition-all"
+              >
+                <UserCircle className="w-5 h-5" />
+                Create Account
+              </Link>
+            </div>
+            <div className="mt-4 pt-4 border-t border-white/10">
               <p className="text-[10px] text-gray-600 leading-relaxed">
                 &ldquo;We help people build safer, stronger homes and
                 buildings.&rdquo;
