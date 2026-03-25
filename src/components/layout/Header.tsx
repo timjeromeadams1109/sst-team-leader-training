@@ -12,11 +12,13 @@ import {
   ShieldCheck,
   UserCircle,
   MessageSquarePlus,
+  Bot,
 } from "lucide-react";
 
 const navItems = [
   { href: "/academy", label: "Academy", icon: GraduationCap },
   { href: "/resources", label: "Documents", icon: FileText },
+  { href: "/chat", label: "Ask AI", icon: Bot },
   { href: "/suggestions", label: "Suggestions", icon: MessageSquarePlus },
 ];
 

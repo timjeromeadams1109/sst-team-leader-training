@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     siteName: "Simpson Strong-Tie Training",
     images: [
       {
-        url: "/og-image.svg",
+        url: "/api/og",
         width: 1200,
         height: 630,
         alt: "SST Team Leader Training Academy",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     title: "SST Team Leader Training Academy",
     description:
       "Build the skills to lead with excellence. TPS & WCM certified training.",
-    images: ["/og-image.svg"],
+    images: ["/api/og"],
   },
 };
 
