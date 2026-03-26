@@ -160,7 +160,7 @@ export default function AcademyHub() {
               key={course.courseId}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + index * 0.08 }}
+              transition={{ delay: 0.08 + index * 0.05 }}
               className={`relative bg-white rounded-2xl border overflow-hidden transition-all ${
                 unlocked
                   ? "border-sst-border/40 shadow-sm hover:shadow-md"
@@ -315,7 +315,7 @@ export default function AcademyHub() {
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.6 }}
+        transition={{ delay: 0.3 }}
         className="mt-12 text-center"
       >
         <div className="bg-sst-dark text-white rounded-2xl p-6 sm:p-8">

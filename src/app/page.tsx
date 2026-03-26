@@ -20,20 +20,22 @@ import {
 } from "lucide-react";
 
 const fadeUp = {
-  initial: { opacity: 0, y: 30 },
+  initial: { opacity: 0, y: 20 },
   whileInView: { opacity: 1, y: 0 },
   viewport: { once: true, amount: 0.1 },
+  transition: { duration: 0.3 },
 };
 
 const stagger = {
-  whileInView: { transition: { staggerChildren: 0.1 } },
+  whileInView: { transition: { staggerChildren: 0.06 } },
   viewport: { once: true },
 };
 
 const childFade = {
-  initial: { opacity: 0, y: 20 },
+  initial: { opacity: 0, y: 14 },
   whileInView: { opacity: 1, y: 0 },
   viewport: { once: true },
+  transition: { duration: 0.25 },
 };
 
 export default function Home() {
@@ -46,28 +48,28 @@ export default function Home() {
           {/* Joist hangers / connectors floating */}
           <motion.div
             animate={{ y: [0, -15, 0], rotate: [0, 3, 0] }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
             className="absolute top-16 left-[8%] opacity-[0.04]"
           >
             <HardHat className="w-32 h-32 sm:w-48 sm:h-48" />
           </motion.div>
           <motion.div
             animate={{ y: [0, 12, 0], rotate: [0, -2, 0] }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
+            transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 1 }}
             className="absolute top-24 right-[10%] opacity-[0.04]"
           >
             <Wrench className="w-28 h-28 sm:w-40 sm:h-40" />
           </motion.div>
           <motion.div
             animate={{ y: [0, -10, 0], rotate: [0, 5, 0] }}
-            transition={{ duration: 9, repeat: Infinity, ease: "easeInOut", delay: 2 }}
+            transition={{ duration: 5.5, repeat: Infinity, ease: "easeInOut", delay: 2 }}
             className="absolute bottom-16 left-[15%] opacity-[0.04]"
           >
             <Cog className="w-24 h-24 sm:w-36 sm:h-36" />
           </motion.div>
           <motion.div
             animate={{ y: [0, 8, 0] }}
-            transition={{ duration: 7, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+            transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
             className="absolute bottom-24 right-[12%] opacity-[0.04]"
           >
             <Shield className="w-32 h-32 sm:w-44 sm:h-44" />
@@ -81,15 +83,15 @@ export default function Home() {
           <div className="flex flex-col lg:flex-row items-center gap-12">
             {/* Left: Text */}
             <motion.div
-              initial={{ opacity: 0, x: -30 }}
+              initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6 }}
+              transition={{ duration: 0.35 }}
               className="flex-1 text-center lg:text-left"
             >
               <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
+                initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.2 }}
+                transition={{ delay: 0.1, duration: 0.2 }}
                 className="inline-flex items-center gap-2 bg-sst-orange/10 border border-sst-orange/20 rounded-full px-4 py-1.5 mb-6"
               >
                 <BookOpen className="w-3.5 h-3.5 text-sst-orange" />
@@ -131,9 +133,9 @@ export default function Home() {
 
             {/* Right: Barc Simpson tribute + stats */}
             <motion.div
-              initial={{ opacity: 0, x: 30 }}
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.3 }}
+              transition={{ duration: 0.35, delay: 0.15 }}
               className="flex-shrink-0"
             >
               <div className="relative w-72 sm:w-80">

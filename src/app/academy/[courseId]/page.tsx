@@ -214,7 +214,7 @@ export default function CoursePage({
               key={mod.id}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.15 + modIndex * 0.05 }}
+              transition={{ delay: 0.08 + modIndex * 0.03 }}
               className="bg-white rounded-2xl border border-sst-border/40 overflow-hidden hover-lift"
             >
               {/* Module header - clickable */}
