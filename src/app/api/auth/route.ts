@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { getServiceClient } from "@/lib/supabase";
+import { validate, authLoginSchema } from "@/lib/validation";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.AUTH_JWT_SECRET || "sst-user-auth-secret-change-me"
@@ -11,11 +12,10 @@ const COOKIE_NAME = "sst-user-token";
 // POST /api/auth — login or register
 export async function POST(request: NextRequest) {
   try {
-    const { action, name, email, password } = await request.json();
-
-    if (!email || !password) {
-      return NextResponse.json({ error: "Email and password required" }, { status: 400 });
-    }
+    const body = await request.json();
+    const parsed = validate(authLoginSchema, body);
+    if ('error' in parsed) return parsed.error;
+    const { action, name, email, password } = parsed.data;
 
     const supabase = getServiceClient();
     if (!supabase) {

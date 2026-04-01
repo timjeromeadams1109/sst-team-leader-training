@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPassword, createToken, COOKIE_NAME } from "@/lib/admin-auth";
+import { validate, adminAuthSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
-    const { password } = await request.json();
-
-    if (!password) {
-      return NextResponse.json({ error: "Password required" }, { status: 400 });
-    }
+    const body = await request.json();
+    const parsed = validate(adminAuthSchema, body);
+    if ('error' in parsed) return parsed.error;
+    const { password } = parsed.data;
 
     const valid = await verifyPassword(password);
     if (!valid) {

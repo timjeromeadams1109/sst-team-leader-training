@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
+import { validate, suggestionSchema } from "@/lib/validation";
 
 // POST — submit a suggestion
 export async function POST(request: NextRequest) {
   try {
-    const { name, category, message } = await request.json();
-
-    if (!message || message.trim().length < 5) {
-      return NextResponse.json({ error: "Suggestion must be at least 5 characters" }, { status: 400 });
-    }
-    if (!category) {
-      return NextResponse.json({ error: "Category is required" }, { status: 400 });
-    }
+    const body = await request.json();
+    const parsed = validate(suggestionSchema, body);
+    if ('error' in parsed) return parsed.error;
+    const { name, category, message } = parsed.data;
 
     const supabase = getServiceClient();
     if (!supabase) {

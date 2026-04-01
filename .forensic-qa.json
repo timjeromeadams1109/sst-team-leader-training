@@ -1,0 +1,45 @@
+{
+  "projectName": "sst-team-leader-training",
+  "baseUrl": "http://localhost:3000",
+  "pages": [
+    { "path": "/", "name": "Home", "expectedStatus": 200 },
+    { "path": "/auth/login", "name": "Login", "expectedStatus": 200 },
+    { "path": "/auth/register", "name": "Register", "expectedStatus": 200 },
+    { "path": "/chat", "name": "Chat", "expectedStatus": 200 },
+    { "path": "/academy", "name": "Academy", "expectedStatus": 200 },
+    { "path": "/resources", "name": "Resources", "expectedStatus": 200 },
+    { "path": "/suggestions", "name": "Suggestions", "expectedStatus": 200 },
+    { "path": "/privacy", "name": "Privacy", "expectedStatus": 200 },
+    { "path": "/terms", "name": "Terms", "expectedStatus": 200 },
+    { "path": "/admin", "name": "Admin", "expectedStatus": 200 },
+    { "path": "/admin/courses", "name": "Admin Courses", "expectedStatus": 200 },
+    { "path": "/admin/analytics", "name": "Admin Analytics", "expectedStatus": 200 }
+  ],
+  "apiEndpoints": [
+    { "method": "POST", "path": "/api/chat", "expectedStatus": 200 },
+    { "method": "GET", "path": "/api/admin/stats", "expectedStatus": 200 },
+    { "method": "POST", "path": "/api/suggestions", "expectedStatus": 200 }
+  ],
+  "userFlows": [
+    {
+      "name": "Landing page navigation",
+      "steps": ["goto:/", "wait:1000"]
+    },
+    {
+      "name": "Login page load",
+      "steps": ["goto:/auth/login", "wait:1000"]
+    }
+  ],
+  "authFlows": [
+    {
+      "name": "Admin login",
+      "steps": ["goto:/admin/login", "fill:email:admin@test.com", "fill:password:test", "click:Sign In"]
+    }
+  ],
+  "forms": [],
+  "consoleErrorThreshold": 0,
+  "performanceBudget": {
+    "firstContentfulPaint": 3000,
+    "largestContentfulPaint": 4000
+  }
+}

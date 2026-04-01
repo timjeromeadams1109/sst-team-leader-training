@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServiceClient } from "@/lib/supabase";
+import { validate, eventSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
-    const event = await request.json();
-
-    if (!event.learner_id || !event.event_type) {
-      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
-    }
+    const body = await request.json();
+    const parsed = validate(eventSchema, body);
+    if ('error' in parsed) return parsed.error;
+    const event = parsed.data;
 
     const supabase = getServiceClient();
     if (!supabase) {

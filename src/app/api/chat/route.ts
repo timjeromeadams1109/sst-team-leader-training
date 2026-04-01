@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { validate, chatSchema } from "@/lib/validation";
 
 const SYSTEM_PROMPT = `You are the SST Training Assistant — a knowledgeable, friendly coach for Simpson Strong-Tie team leaders. You specialize in:
 
@@ -98,16 +99,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { messages } = await request.json();
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return NextResponse.json({ error: "Messages required" }, { status: 400 });
-    }
+    const body = await request.json();
+    const parsed = validate(chatSchema, body);
+    if ('error' in parsed) return parsed.error;
+    const { messages } = parsed.data;
 
     const client = new Anthropic({ apiKey });
 
     const response = await client.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 1024,
+      temperature: 0.3,
       system: SYSTEM_PROMPT,
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role as "user" | "assistant",
