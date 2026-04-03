@@ -3,6 +3,7 @@ import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { getServiceClient } from "@/lib/supabase";
 import { validate, authLoginSchema } from "@/lib/validation";
+import { loginLimiter, registerLimiter, checkRateLimit } from "@/lib/ratelimit";
 
 const JWT_SECRET = new TextEncoder().encode(
   process.env.AUTH_JWT_SECRET || "sst-user-auth-secret-change-me"
@@ -16,6 +17,25 @@ export async function POST(request: NextRequest) {
     const parsed = validate(authLoginSchema, body);
     if ('error' in parsed) return parsed.error;
     const { action, name, email, password } = parsed.data;
+
+    // Rate limiting — keyed by IP, scoped to the action being performed.
+    // Fails open when Redis is unavailable so auth remains functional.
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+      request.headers.get("x-real-ip") ??
+      "unknown";
+
+    const limiter = action === "register" ? registerLimiter : loginLimiter;
+    const rl = await checkRateLimit(limiter, `${action}:${ip}`);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rl.retryAfter) },
+        }
+      );
+    }
 
     const supabase = getServiceClient();
     if (!supabase) {

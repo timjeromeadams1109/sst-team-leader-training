@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyPassword, createToken, COOKIE_NAME } from "@/lib/admin-auth";
 import { validate, adminAuthSchema } from "@/lib/validation";
+import { adminLoginLimiter, checkRateLimit } from "@/lib/ratelimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -8,6 +9,24 @@ export async function POST(request: NextRequest) {
     const parsed = validate(adminAuthSchema, body);
     if ('error' in parsed) return parsed.error;
     const { password } = parsed.data;
+
+    // Rate limiting — 3 attempts per 15 minutes per IP.
+    // Fails open when Redis is unavailable so admin auth remains functional.
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+      request.headers.get("x-real-ip") ??
+      "unknown";
+
+    const rl = await checkRateLimit(adminLoginLimiter, `admin-login:${ip}`);
+    if (rl.limited) {
+      return NextResponse.json(
+        { error: "Too many requests. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": String(rl.retryAfter) },
+        }
+      );
+    }
 
     const valid = await verifyPassword(password);
     if (!valid) {
