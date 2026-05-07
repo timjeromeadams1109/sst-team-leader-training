@@ -91,6 +91,20 @@ export const documents: Document[] = [
     category: "quality",
     icon: "🚨",
   },
+  {
+    id: "lpa-calendar-instructions",
+    title: "LPA Calendar Instructions (WKI 1200)",
+    description: "How to complete a Layered Process Audit — standard method, weekly expectations, FAQs. Version 1.0, Jan 2026.",
+    category: "quality",
+    icon: "📆",
+  },
+  {
+    id: "lpa-deployment-plan",
+    title: "LPA Multi-Site Deployment Plan",
+    description: "Riverside-proven 4-layer LPA rollout strategy for additional SST manufacturing locations. One site at a time, 18-month horizon.",
+    category: "improvement",
+    icon: "🏭",
+  },
 ];
 
 export const categoryLabels: Record<string, string> = {
