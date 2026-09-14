@@ -11,6 +11,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // `next dev` auto-appends an "agent rules" block to this repo's real
+  // AGENTS.md (a documentation file, not a config file) unless disabled.
+  // Confirmed live 2026-08-28 on Next.js 16.3.3 — verify still needed on
+  // major Next.js upgrades. See node_modules/next/dist/server/lib/
+  // generate-agent-files.js.
+  agentRules: false,
   poweredByHeader: false,
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
