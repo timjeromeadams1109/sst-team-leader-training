@@ -73,7 +73,10 @@ jobs:
           echo "Scanning for hardcoded secrets..."
 
           # Check for common secret patterns
-          if grep -r "PRIVATE_KEY\|API_KEY\|SECRET\|PASSWORD" . \
+          # Flags only a secret-named identifier assigned a quoted literal of 12+
+          # chars (e.g. API_KEY = "abc123..."). Mentions of the name in error text,
+          # variable references, or env lookups are not hardcoded secrets.
+          if grep -rEi "(PRIVATE_KEY|API_KEY|SECRET|PASSWORD)[A-Za-z0-9_]*[\"']?([[:space:]]*:[[:space:]]*[A-Za-z]+)?[[:space:]]*[:=][[:space:]]*[\"'\`][^\"'\`\$[:space:]]{12,}[\"'\`]" . \
             --include="*.ts" --include="*.js" --include="*.tsx" --include="*.jsx" \
             --exclude-dir=node_modules --exclude-dir=.git \
             | grep -v "process.env\|ENV\|\.env" > /tmp/secrets.txt 2>&1; then
