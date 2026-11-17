@@ -6,6 +6,7 @@ on:
     types: [opened, synchronize, reopened]
 
 permissions:
+  contents: read
   pull-requests: write
   checks: write
   statuses: write
@@ -15,6 +16,9 @@ jobs:
     name: Run Tests
     runs-on: ubuntu-latest
     continue-on-error: false
+    outputs:
+      # passed | not_run. Unset if the test step failed or never ran.
+      tests_status: ${{ steps.run_tests.outputs.tests_status }}
 
     steps:
       - uses: actions/checkout@v4
@@ -27,18 +31,41 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
 
+      - name: Select package manager
+        run: |
+          # Decide ONCE, before install. `bun install` deletes an empty bun.lock in a
+          # dependency-free project, so later steps must not re-check lockfiles.
+          if [ -f "bun.lock" ]; then
+            PM=bun; LOCK=bun.lock
+          elif [ -f "bun.lockb" ]; then
+            PM=bun; LOCK=bun.lockb
+          elif [ -f "package-lock.json" ]; then
+            PM=npm-ci; LOCK=package-lock.json
+          else
+            PM=npm; LOCK=none
+          fi
+          echo "PM=$PM" >> "$GITHUB_ENV"
+          echo "Selected package manager: $PM (lockfile: $LOCK)"
+
       - name: Install dependencies
         run: |
-          if [ -f "bun.lockb" ]; then
-            bun install
-          else
-            npm install
-          fi
+          case "$PM" in
+            bun)    echo "Running: bun install"; bun install ;;
+            npm-ci) echo "Running: npm ci"; npm ci ;;
+            npm)    echo "Running: npm install"; npm install ;;
+            *)      echo "Unknown PM: '$PM'"; exit 1 ;;
+          esac
 
       - name: Run linting
         run: |
           if [ -f "package.json" ] && grep -q '"lint"' package.json; then
-            bun run lint || npm run lint
+            if [ "$PM" = "bun" ]; then
+              echo "Running: bun run lint"
+              bun run lint
+            else
+              echo "Running: npm run lint"
+              npm run lint
+            fi
           else
             echo "No lint script found"
           fi
@@ -52,11 +79,25 @@ jobs:
         continue-on-error: true
 
       - name: Run tests
+        id: run_tests
         run: |
           if [ -f "package.json" ] && grep -q '"test"' package.json; then
-            bun run test || npm test
+            if [ "$PM" = "bun" ]; then
+              echo "Running: bun run test"
+              bun run test
+            else
+              echo "Running: npm test"
+              npm test
+            fi
+            # Only reached if the test command succeeded (bash -e fails the step otherwise).
+            echo "tests_status=passed" >> "$GITHUB_OUTPUT"
           else
-            echo "No test script found — skipping"
+            echo "tests_status=not_run" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Tests NOT RUN::No executable test suite found."
+            {
+              echo "### Tests: NOT RUN"
+              echo "No executable test suite found. This check did NOT verify your tests."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
         continue-on-error: false
 
@@ -64,11 +105,32 @@ jobs:
     name: Security Scan
     runs-on: ubuntu-latest
     continue-on-error: false
+    outputs:
+      # secret_outcome: outcome of the secret-pattern step (success | failure | ...).
+      secret_outcome: ${{ steps.secrets.outcome }}
+      # dep_outcome: outcome of the dependency audit step itself.
+      dep_outcome: ${{ steps.dep_audit.outcome }}
+      # dep_status: verified | failed | not_verified. Unset only if the step never wrote it.
+      dep_status: ${{ steps.dep_audit.outputs.dep_status }}
+      # Package counts by severity (empty when NOT VERIFIED: unknown is not zero).
+      dep_critical: ${{ steps.dep_audit.outputs.dep_critical }}
+      dep_high: ${{ steps.dep_audit.outputs.dep_high }}
+      dep_moderate: ${{ steps.dep_audit.outputs.dep_moderate }}
+      dep_low: ${{ steps.dep_audit.outputs.dep_low }}
+      dep_reason: ${{ steps.dep_audit.outputs.dep_reason }}
 
     steps:
       - uses: actions/checkout@v4
 
+      # Only needed so `bun audit` exists for bun lockfiles. No dependency install.
+      # Failure here is not fatal: the audit step reports NOT VERIFIED if bun is missing.
+      - name: Setup Bun (bun lockfiles only)
+        if: ${{ hashFiles('bun.lock', 'bun.lockb') != '' }}
+        continue-on-error: true
+        uses: oven-sh/setup-bun@v2
+
       - name: Check for hardcoded secrets
+        id: secrets
         run: |
           echo "Scanning for hardcoded secrets..."
 
@@ -87,13 +149,190 @@ jobs:
 
           echo "✓ No obvious hardcoded secrets found"
 
-      - name: Dependency vulnerability scan
+      - name: Dependency audit
+        id: dep_audit
+        # always(): the dependency result is reported even if the secret scan failed.
+        if: always()
+        timeout-minutes: 10
         run: |
-          echo "Scanning dependencies for vulnerabilities..."
-          if [ -f "package.json" ]; then
-            npm audit --audit-level=moderate || true
+          # ============================ PILOT POLICY ============================
+          # PILOT POLICY: approved for the pilot only; not approved for production rollout.
+          # (Owner approval of the pilot policy was relayed by the coordinator on 2026-11-14.)
+          # Policy: CRITICAL findings block, dev dependencies included. HIGH, MODERATE and LOW are
+          # counted and reported, never blocking. A failed, unavailable, unsupported or incomplete
+          # audit is NOT VERIFIED (never VERIFIED). NOT VERIFIED does not block during the pilot only
+          # and must stay visible: step summary, check-run warning annotation, PR comment headline.
+          # Scope: dependency audit only (known advisories in locked dependencies).
+          # BLOCK_AT = lowest severity that FAILS this check (critical | high | moderate | low).
+          # Pilot value: critical only. Lower severities are reported, never blocking.
+          BLOCK_AT=critical
+          # ======================================================================
+          #
+          # Outcomes (exactly three):
+          #   verified      audit ran, output parsed, nothing at/above BLOCK_AT
+          #   failed        audit ran, output parsed, >=1 finding at/above BLOCK_AT
+          #   not_verified  audit could not run or could not be trusted (never a pass)
+          # Scope: known advisories in LOCKED dependencies only (npm: package-lock.json via
+          # `npm audit`; bun: bun.lock / bun.lockb via `bun audit`). Nothing is installed.
+          W="$(mktemp -d)"
+          SUMMARY="${GITHUB_STEP_SUMMARY:-/dev/null}"
+          OUTFILE="${GITHUB_OUTPUT:-/dev/null}"
+          TOOL=none
+
+          finish() { # <status> <reason> <critical> <high> <moderate> <low> [critical package names]
+            {
+              echo "dep_status=$1"; echo "dep_reason=$2"
+              echo "dep_critical=$3"; echo "dep_high=$4"; echo "dep_moderate=$5"; echo "dep_low=$6"
+            } >> "$OUTFILE"
+            {
+              case "$1" in
+                verified) echo "### Dependency audit: VERIFIED — no $BLOCK_AT-or-higher findings" ;;
+                failed)   echo "### Dependency audit: FAILED — $2" ;;
+                *)        echo "### Dependency audit: NOT VERIFIED" ;;
+              esac
+              echo ""
+              if [ "$1" = not_verified ]; then
+                echo "Reason: $2"
+                echo "This is NOT a pass. No dependency result was established."
+              else
+                echo "Tool: $TOOL. Vulnerable packages by severity: critical $3, high $4, moderate $5, low $6."
+                if [ -n "${7:-}" ]; then echo "Critical: $7"; fi
+              fi
+              echo ""
+              echo "Scope: dependency audit only (known advisories in locked dependencies). The secret scan is a pattern check. This is not a complete application security review."
+              echo "PILOT POLICY (approved for the pilot only, not for production): only $BLOCK_AT-or-higher findings (dev dependencies included) fail this check; lower severities are reported, not blocking."
+            } >> "$SUMMARY"
+            case "$1" in
+              verified) echo "Dependency audit VERIFIED ($TOOL): critical $3, high $4, moderate $5, low $6." ;;
+              failed)   echo "::error title=Dependency audit FAILED::$2"; exit 1 ;;
+              *)        echo "::warning title=Dependency audit NOT VERIFIED::$2" ;;
+            esac
+            exit 0
+          }
+          nv() { finish not_verified "$1" "" "" "" ""; }
+
+          case "$BLOCK_AT" in critical|high|moderate|low) ;; *) nv "invalid BLOCK_AT '$BLOCK_AT' in the gate template" ;; esac
+          [ -f package.json ] || nv "no package.json found; no supported dependency manifest to audit"
+
+          FOUND=""; N=0
+          for f in bun.lock bun.lockb package-lock.json npm-shrinkwrap.json yarn.lock pnpm-lock.yaml; do
+            if [ -f "$f" ]; then FOUND="$FOUND $f"; N=$((N+1)); fi
+          done
+          [ "$N" -eq 0 ] && nv "no lockfile found (need package-lock.json, bun.lock or bun.lockb)"
+          [ "$N" -gt 1 ] && nv "ambiguous lockfiles present:$FOUND (cannot tell which one is authoritative)"
+          case "${FOUND# }" in
+            package-lock.json)  TOOL=npm ;;
+            bun.lock|bun.lockb) TOOL=bun ;;
+            *) nv "unsupported package manager lockfile: ${FOUND# } (supported: package-lock.json, bun.lock, bun.lockb)" ;;
+          esac
+          command -v node >/dev/null 2>&1 || nv "node is not available to parse the audit output"
+          command -v "$TOOL" >/dev/null 2>&1 || nv "$TOOL is not installed on the runner"
+
+          RC=0
+          if [ "$TOOL" = npm ]; then
+            echo "Running: npm audit --json --package-lock-only"
+            npm audit --json --package-lock-only > "$W/out.json" 2> "$W/err.txt" || RC=$?
+          else
+            # An old bun treats `audit` as a user script name (and would RUN a package.json
+            # "audit" script), so probe for the real subcommand from an empty directory first.
+            mkdir "$W/probe"
+            if ! (cd "$W/probe" && bun audit --help 2>&1 | grep -q "Usage: bun audit"); then
+              nv "bun is too old or lacks 'bun audit' (needs a bun with the audit subcommand)"
+            fi
+            echo "Running: bun audit --json"
+            bun audit --json > "$W/out.json" 2> "$W/err.txt" || RC=$?
           fi
-          echo "✓ Dependency scan complete"
+          echo "$TOOL audit exit code: $RC"
+          head -c 2000 "$W/err.txt" | head -n 20
+
+          cat > "$W/parse.js" <<'NODE'
+          const fs = require('fs');
+          const [tool, file, rcArg, blockAt] = process.argv.slice(2);
+          const rc = Number(rcArg);
+          const clean = (s) => String(s).replace(/[^A-Za-z0-9 .,:;()\/_@=<>'+-]/g, '?').slice(0, 300);
+          const emit = (o) => {
+            for (const k of Object.keys(o)) console.log(k + '=' + clean(o[k]));
+          };
+          const nv = (reason) => { emit({ status: 'not_verified', reason }); process.exit(0); };
+          const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+          const LEVELS = ['low', 'moderate', 'high', 'critical'];
+          const KNOWN = ['info'].concat(LEVELS);
+          if (!Number.isInteger(rc)) nv('audit exit code unknown');
+          let data;
+          try { data = JSON.parse(fs.readFileSync(file, 'utf8')); }
+          catch (e) { nv(tool + ' audit exit ' + rc + ' with no parseable JSON (error, not a clean result)'); }
+          if (!isObj(data)) nv('audit output JSON was not an object');
+          const counts = { low: 0, moderate: 0, high: 0, critical: 0 };
+          const critNames = [];
+          if (tool === 'npm') {
+            if ('error' in data || 'message' in data) {
+              const e = isObj(data.error) ? data.error : {};
+              nv('npm audit reported an error' + (e.code ? ' (' + e.code + ')' : '') + ': ' + (e.summary || data.message || 'no detail'));
+            }
+            const meta = isObj(data.metadata) ? data.metadata.vulnerabilities : null;
+            if (data.auditReportVersion !== 2 || !isObj(data.vulnerabilities) || !isObj(meta)) {
+              nv('unexpected npm audit JSON shape');
+            }
+            for (const l of LEVELS) {
+              if (!Number.isInteger(meta[l]) || meta[l] < 0) nv('unexpected npm audit JSON shape (bad ' + l + ' count)');
+              counts[l] = meta[l];
+            }
+            const fromEntries = { low: 0, moderate: 0, high: 0, critical: 0 };
+            for (const name of Object.keys(data.vulnerabilities)) {
+              const sev = isObj(data.vulnerabilities[name]) ? data.vulnerabilities[name].severity : undefined;
+              if (!KNOWN.includes(sev)) nv('unrecognised severity in npm audit JSON');
+              if (sev !== 'info') fromEntries[sev] += 1;
+              if (sev === 'critical') critNames.push(name);
+            }
+            // Fail safe: never report fewer packages than the entries list shows.
+            for (const l of LEVELS) counts[l] = Math.max(counts[l], fromEntries[l]);
+          } else if (tool === 'bun') {
+            for (const pkg of Object.keys(data)) {
+              const advs = data[pkg];
+              if (!Array.isArray(advs) || advs.length === 0) nv('unexpected bun audit JSON shape');
+              let worst = -1;
+              for (const a of advs) {
+                if (!isObj(a) || !KNOWN.includes(a.severity)) nv('unrecognised severity in bun audit JSON');
+                worst = Math.max(worst, KNOWN.indexOf(a.severity));
+              }
+              if (worst > 0) { counts[KNOWN[worst]] += 1; if (KNOWN[worst] === 'critical') critNames.push(pkg); }
+            }
+          } else {
+            nv('unsupported audit tool');
+          }
+          const total = counts.low + counts.moderate + counts.high + counts.critical;
+          if (rc !== 0 && total === 0) nv(tool + ' audit exited ' + rc + ' but reported no findings (cannot treat as clean)');
+          const at = LEVELS.indexOf(blockAt);
+          if (at < 0) nv('invalid BLOCK_AT');
+          let blocking = 0;
+          for (let i = at; i < LEVELS.length; i++) blocking += counts[LEVELS[i]];
+          emit({
+            status: blocking > 0 ? 'failed' : 'verified',
+            reason: blocking > 0 ? blocking + ' vulnerable package(s) at ' + blockAt + ' or higher in locked dependencies' : '',
+            critical: counts.critical, high: counts.high, moderate: counts.moderate, low: counts.low,
+            names: critNames.slice(0, 10).join(', ')
+          });
+          NODE
+          node "$W/parse.js" "$TOOL" "$W/out.json" "$RC" "$BLOCK_AT" > "$W/result.txt" 2> "$W/parse_err.txt" || echo "parser exited non-zero: $(head -c 300 "$W/parse_err.txt")"
+          S=""; REASON=""; C=""; H=""; M=""; L=""; NAMES=""
+          while IFS= read -r line; do
+            case "$line" in
+              status=*)   S="${line#status=}" ;;
+              reason=*)   REASON="${line#reason=}" ;;
+              critical=*) C="${line#critical=}" ;;
+              high=*)     H="${line#high=}" ;;
+              moderate=*) M="${line#moderate=}" ;;
+              low=*)      L="${line#low=}" ;;
+              names=*)    NAMES="${line#names=}" ;;
+            esac
+          done < "$W/result.txt"
+          case "$S" in
+            verified|failed)
+              case "$C$H$M$L" in *[!0-9]*|"") nv "audit result parser returned non-numeric counts" ;; esac
+              finish "$S" "$REASON" "$C" "$H" "$M" "$L" "$NAMES" ;;
+            not_verified) nv "${REASON:-audit result could not be established}" ;;
+            *)            nv "audit result parser produced no usable result" ;;
+          esac
 
   gates:
     name: Enforce Quality Gates
@@ -103,47 +342,247 @@ jobs:
 
     steps:
       - name: Check test results
+        env:
+          TESTS_RESULT: ${{ needs.tests.result }}
+          TESTS_STATUS: ${{ needs.tests.outputs.tests_status }}
         run: |
-          if [ "${{ needs.tests.result }}" != "success" ]; then
-            echo "❌ Tests FAILED — merge blocked"
+          fail() {
+            echo "$1"
+            { echo "### $1"; } >> "$GITHUB_STEP_SUMMARY"
             exit 1
-          else
-            echo "✅ Tests PASSED"
-          fi
+          }
+          case "$TESTS_RESULT" in
+            success) ;;
+            failure)   fail "❌ Tests FAILED — this check fails." ;;
+            cancelled) fail "❌ Tests CANCELLED — result unknown; this check fails (fail-closed)." ;;
+            skipped)   fail "❌ Tests SKIPPED — result unknown; this check fails (fail-closed)." ;;
+            *)         fail "❌ Tests status UNKNOWN — this check fails (fail-closed)." ;;
+          esac
+          case "$TESTS_STATUS" in
+            passed)
+              echo "✅ Tests PASSED"
+              ;;
+            not_run)
+              # Non-blocking by owner policy, but never reported as passed.
+              echo "Tests: NOT RUN — No executable test suite found."
+              {
+                echo "### Tests: NOT RUN"
+                echo "No executable test suite found. This check did NOT verify your tests."
+              } >> "$GITHUB_STEP_SUMMARY"
+              ;;
+            *)
+              fail "❌ Tests status UNKNOWN — this check fails (fail-closed)."
+              ;;
+          esac
 
       - name: Check security results
+        # always(): still record the secret-scan and dependency-audit lines when the tests step failed.
+        if: always()
+        env:
+          SECURITY_RESULT: ${{ needs.security.result }}
+          SECRET_OUTCOME: ${{ needs.security.outputs.secret_outcome }}
+          DEP_STATUS: ${{ needs.security.outputs.dep_status }}
+          DEP_CRITICAL: ${{ needs.security.outputs.dep_critical }}
+          DEP_HIGH: ${{ needs.security.outputs.dep_high }}
+          DEP_MODERATE: ${{ needs.security.outputs.dep_moderate }}
+          DEP_LOW: ${{ needs.security.outputs.dep_low }}
+          DEP_REASON: ${{ needs.security.outputs.dep_reason }}
         run: |
-          if [ "${{ needs.security.result }}" != "success" ]; then
-            echo "❌ Security scan FAILED — merge blocked"
-            exit 1
+          # ONE rule for the dependency result (same rule in the Post verdict script below):
+          #   FAILED        critical count is a number > 0 (whatever dep_status says: fail closed), or
+          #                 dep_status=failed (even with critical 0 or missing: fail closed).
+          #   VERIFIED      only dep_status=verified AND critical is exactly "0" AND high/moderate/low parse.
+          #   NOT VERIFIED  everything else (missing/unknown status, not_verified, verified with a missing
+          #                 or non-numeric count). Non-blocking in the pilot, never shown as a pass, and
+          #                 emitted as a ::warning annotation so the check run itself shows it.
+          is_num() { case "$1" in ""|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+          is_nonzero() { is_num "$1" && case "$1" in *[!0]*) return 0 ;; *) return 1 ;; esac; }
+          num_or_q() { if is_num "$1"; then echo "$1"; else echo "?"; fi; }
+          # Single line, no control characters, no '::' (annotation command injection), no '%'.
+          sanitize() { printf '%s' "$1" | tr -d '\r\n' | tr -c 'A-Za-z0-9 .,:;()/_@=<>+-' '?' | sed 's/:\{2,\}/:/g' | cut -c1-300; }
+          DEP_EFF=""; DEP_EFF_REASON=""
+          case "$DEP_STATUS" in verified|failed|not_verified) ST="$DEP_STATUS" ;; *) ST="unset-or-unknown" ;; esac
+          if is_nonzero "$DEP_CRITICAL"; then
+            DEP_EFF=failed
+            if [ "$ST" = failed ]; then DEP_EFF_REASON="$DEP_REASON"
+            else DEP_EFF_REASON="critical count $DEP_CRITICAL contradicts dep_status=$ST (fail closed)"; fi
+          elif [ "$ST" = failed ]; then
+            DEP_EFF=failed; DEP_EFF_REASON="dep_status=failed without a positive critical count (fail closed)"
+          elif [ "$ST" = verified ] && [ "$DEP_CRITICAL" = "0" ] && is_num "$DEP_HIGH" && is_num "$DEP_MODERATE" && is_num "$DEP_LOW"; then
+            DEP_EFF=verified
           else
-            echo "✅ Security scan PASSED"
+            DEP_EFF=not_verified
+            case "$ST" in
+              verified)     DEP_EFF_REASON="the audit reported VERIFIED without a valid critical count of 0 and numeric high/moderate/low counts" ;;
+              not_verified) DEP_EFF_REASON="${DEP_REASON:-no reason reported}" ;;
+              *)            DEP_EFF_REASON="the security job reported no dependency audit status" ;;
+            esac
           fi
+          DEP_EFF_REASON="$(sanitize "$DEP_EFF_REASON")"
+          # Dependency audit line, always truthful.
+          dep_report() {
+            local msg
+            case "$DEP_EFF" in
+              verified)
+                msg="Dependency audit VERIFIED: critical 0; non-blocking: high $DEP_HIGH, moderate $DEP_MODERATE, low $DEP_LOW (known advisories in locked dependencies only)." ;;
+              failed)
+                msg="Dependency audit FAILED: $(num_or_q "$DEP_CRITICAL") critical (non-blocking: high $(num_or_q "$DEP_HIGH"), moderate $(num_or_q "$DEP_MODERATE"), low $(num_or_q "$DEP_LOW")). $DEP_EFF_REASON" ;;
+              *)
+                msg="Dependency audit NOT VERIFIED: $DEP_EFF_REASON. This is not a pass."
+                echo "::warning title=Dependency audit NOT VERIFIED::$DEP_EFF_REASON. This is not a pass." ;;
+            esac
+            echo "$msg"
+            { echo "### $msg"; echo "Scope: dependency audit only. The secret scan is a pattern check; this is not a complete application security review."; } >> "$GITHUB_STEP_SUMMARY"
+          }
+          dep_failed_line() {
+            if is_nonzero "$DEP_CRITICAL"; then echo "❌ Dependency audit FAILED — $DEP_CRITICAL critical; this check fails."
+            else echo "❌ Dependency audit FAILED — no confirmed critical count; this check fails (fail-closed)."; fi
+          }
+          sec_fail() {
+            echo "$1"
+            { echo "### $1"; } >> "$GITHUB_STEP_SUMMARY"
+            dep_report
+            exit 1
+          }
+          case "$SECURITY_RESULT" in
+            success)
+              echo "Secret-pattern scan PASSED (pattern check only)."
+              { echo "### Secret-pattern scan: PASSED (pattern check only)"; } >> "$GITHUB_STEP_SUMMARY"
+              # A failed dependency result fails this check even if the security job reported success.
+              if [ "$DEP_EFF" = "failed" ]; then
+                sec_fail "$(dep_failed_line)"
+              fi
+              dep_report
+              ;;
+            failure)
+              if [ "$SECRET_OUTCOME" = "failure" ]; then
+                sec_fail "❌ Secret-pattern scan FAILED — this check fails."
+              elif [ "$DEP_EFF" = "failed" ]; then
+                sec_fail "$(dep_failed_line)"
+              else
+                sec_fail "❌ Security scan job FAILED — cause not reported; this check fails (fail-closed)."
+              fi
+              ;;
+            cancelled) sec_fail "❌ Secret-pattern scan CANCELLED — result unknown; this check fails (fail-closed)." ;;
+            skipped)   sec_fail "❌ Secret-pattern scan SKIPPED — result unknown; this check fails (fail-closed)." ;;
+            *)         sec_fail "❌ Secret-pattern scan status UNKNOWN — this check fails (fail-closed)." ;;
+          esac
 
       - name: Post verdict
         if: always()
         uses: actions/github-script@v7
+        env:
+          TESTS_RESULT: ${{ needs.tests.result }}
+          TESTS_STATUS: ${{ needs.tests.outputs.tests_status }}
+          SECURITY_RESULT: ${{ needs.security.result }}
+          SECRET_OUTCOME: ${{ needs.security.outputs.secret_outcome }}
+          DEP_STATUS: ${{ needs.security.outputs.dep_status }}
+          DEP_CRITICAL: ${{ needs.security.outputs.dep_critical }}
+          DEP_HIGH: ${{ needs.security.outputs.dep_high }}
+          DEP_MODERATE: ${{ needs.security.outputs.dep_moderate }}
+          DEP_LOW: ${{ needs.security.outputs.dep_low }}
+          DEP_REASON: ${{ needs.security.outputs.dep_reason }}
         with:
           script: |
-            const testsPassed = '${{ needs.tests.result }}' === 'success';
-            const securityPassed = '${{ needs.security.result }}' === 'success';
-            const allPassed = testsPassed && securityPassed;
+            const testsResult = process.env.TESTS_RESULT;
+            const testsStatus = process.env.TESTS_STATUS;
+            const securityResult = process.env.SECURITY_RESULT;
+            const secretOutcome = process.env.SECRET_OUTCOME;
+            const securityPassed = securityResult === 'success';
+            const testsRan = testsResult === 'success' && testsStatus === 'passed';
+            const testsNotRun = testsResult === 'success' && testsStatus === 'not_run';
+            const incompleteResults = ['cancelled', 'skipped'];
+            const testsIncomplete = incompleteResults.includes(testsResult);
+            const securityIncomplete = incompleteResults.includes(securityResult);
 
-            const verdict = allPassed ? '✅ APPROVED' : '❌ BLOCKED';
+            // Dependency result: ONE rule, identical to the "Check security results" step above.
+            //   FAILED: critical is a number > 0 (whatever dep_status says), or dep_status=failed.
+            //   VERIFIED: only dep_status=verified AND critical exactly '0' AND numeric high/moderate/low.
+            //   NOT VERIFIED: everything else (missing/unknown status, not_verified, bad counts).
+            const depRaw = process.env.DEP_STATUS || '';
+            const depStatus = ['verified', 'failed', 'not_verified'].includes(depRaw) ? depRaw : 'unset-or-unknown';
+            const isNum = (v) => /^[0-9]+$/.test(v || '');
+            const isNonZero = (v) => isNum(v) && /[1-9]/.test(v);
+            const depCount = (v) => (isNum(v) ? v : '?');
+            const depCritical = process.env.DEP_CRITICAL || '';
+            const depNonBlocking = `non-blocking: high ${depCount(process.env.DEP_HIGH)}, moderate ${depCount(process.env.DEP_MODERATE)}, low ${depCount(process.env.DEP_LOW)}`;
+            const clean = (s) => String(s).replace(/[\r\n]+/g, ' ').replace(/[^A-Za-z0-9 .,:;()\/_@=<>+-]/g, '?').replace(/:{2,}/g, ':').slice(0, 300);
+            let depEff;
+            let depReason;
+            if (isNonZero(depCritical)) {
+              depEff = 'failed';
+              depReason = depStatus === 'failed' ? (process.env.DEP_REASON || '') : `critical count ${depCritical} contradicts dep_status=${depStatus} (fail closed)`;
+            } else if (depStatus === 'failed') {
+              depEff = 'failed';
+              depReason = 'dep_status=failed without a positive critical count (fail closed)';
+            } else if (depStatus === 'verified' && depCritical === '0' && isNum(process.env.DEP_HIGH) && isNum(process.env.DEP_MODERATE) && isNum(process.env.DEP_LOW)) {
+              depEff = 'verified';
+              depReason = '';
+            } else {
+              depEff = 'not_verified';
+              if (depStatus === 'verified') depReason = 'the audit reported VERIFIED without a valid critical count of 0 and numeric high/moderate/low counts';
+              else if (depStatus === 'not_verified') depReason = process.env.DEP_REASON || 'no reason reported';
+              else depReason = 'the security job reported no dependency audit status';
+            }
+            depReason = clean(depReason);
+            const depVerified = depEff === 'verified';
+            const depFailed = depEff === 'failed';
+            const depNotVerified = depEff === 'not_verified';
+            const depCriticalShown = isNonZero(depCritical) ? depCritical : null;
+
+            let verdict;
+            if (testsRan && securityPassed && depVerified) {
+              verdict = '✅ CHECKS PASSED (tests, secret-pattern scan and dependency audit)';
+            } else if ((testsRan || testsNotRun) && securityPassed && !depFailed) {
+              const unverified = [];
+              if (testsNotRun) unverified.push('tests NOT RUN');
+              if (depNotVerified) unverified.push('dependency audit NOT VERIFIED');
+              verdict = `⚠️ NOT VERIFIED (${unverified.join('; ')})`;
+            } else if (testsResult === 'failure' || securityResult === 'failure' || depFailed) {
+              verdict = '❌ CHECKS FAILED' + (depFailed ? (depCriticalShown ? ` (dependency audit: ${depCriticalShown} critical)` : ' (dependency audit FAILED)') : '');
+            } else if ((testsIncomplete || testsRan || testsNotRun) && (securityIncomplete || securityPassed)) {
+              verdict = '❌ CHECKS INCOMPLETE';
+            } else {
+              verdict = '❌ CHECKS FAILED';
+            }
+
+            let testsLine;
+            if (testsRan) testsLine = '✅ Tests: PASSED';
+            else if (testsNotRun) testsLine = '⚠️ Tests: NOT RUN — No executable test suite found.';
+            else if (testsResult === 'failure') testsLine = '❌ Tests: FAILED';
+            else if (testsResult === 'cancelled') testsLine = '⚪ Tests: CANCELLED — the run was cancelled before a test result';
+            else if (testsResult === 'skipped') testsLine = '⚪ Tests: SKIPPED — the tests job did not run';
+            else testsLine = '❌ Tests: UNKNOWN — the test job succeeded but reported no status';
+
+            let secretLine;
+            if (securityResult === 'success') secretLine = '✅ Secret-pattern scan: PASSED';
+            else if (securityResult === 'cancelled') secretLine = '⚪ Secret-pattern scan: CANCELLED';
+            else if (securityResult === 'skipped') secretLine = '⚪ Secret-pattern scan: SKIPPED';
+            else if (securityResult === 'failure' && secretOutcome === 'success') secretLine = '✅ Secret-pattern scan: PASSED';
+            else if (securityResult === 'failure' && secretOutcome !== 'failure') secretLine = '⚪ Secret-pattern scan: no failure reported (the security job failed elsewhere)';
+            else secretLine = '❌ Secret-pattern scan: FAILED';
+
+            let depLine;
+            if (depVerified) depLine = `✅ Dependency audit: VERIFIED — 0 critical (${depNonBlocking}) in locked dependencies.`;
+            else if (depFailed) depLine = `❌ Dependency audit: FAILED — ${depCriticalShown || '?'} critical (${depNonBlocking}). ${depReason}`;
+            else depLine = `⚠️ Dependency audit: NOT VERIFIED — ${depReason}. This is not a pass.`;
+
             const details = [
-              testsPassed ? '✅ Tests: PASSED' : '❌ Tests: FAILED',
-              securityPassed ? '✅ Security: PASSED' : '❌ Security: FAILED'
+              testsLine,
+              secretLine,
+              depLine,
+              '_Scope: dependency audit only (known advisories in locked dependencies). PILOT policy (approved for the pilot only, not for production): critical findings (dev dependencies included) fail the check; lower severities are reported, not blocking; NOT VERIFIED does not block during the pilot. The secret scan is a pattern check. This is not a complete application security review._'
             ].join('\n');
 
-            const body = `## Maven Quality Gate Verdict: ${verdict}\n\n${details}\n\n---\n*Automated enforcement by Maven. PR cannot merge until all gates pass.*`;
+            const body = `## Maven Quality Gate Verdict: ${verdict}\n\n${details}\n\n---\n*Automated by Maven. This check reports status; a merge is blocked only if a repository rule requires this check.*`;
 
-            github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
               body: body
             });
 
-            if (!allPassed) {
-              core.setFailed('Quality gates failed — merge blocked');
+            if (verdict.startsWith('❌')) {
+              core.setFailed('Quality gates did not pass (a merge is blocked only if a repository rule requires this check).');
             }
